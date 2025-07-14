@@ -8,6 +8,12 @@
   </head>
   <body>
     <h1>羽田空港 到着便一覧</h1>
+    <div style="text-align: center; margin-bottom: 20px;">
+        <button id="refreshBtn" onclick="fetchFlights()" style="padding: 10px 20px; font-size: 16px; background-color: #0082f0; color: white; border: none; border-radius: 5px; cursor: pointer;">
+            更新
+        </button>
+        <span id="lastUpdate" style="margin-left: 20px; color: #666; font-size: 14px;"></span>
+    </div>
     <div id="loading" class="loading-message">フライト情報を読み込み中...</div>
     <div id="error" class="error-message" style="display: none;"></div>
     <table border="1" id="flightTable" style="display: none;">
@@ -26,19 +32,43 @@
             const loadingDiv = document.getElementById('loading');
             const errorDiv = document.getElementById('error');
             const table = document.getElementById('flightTable');
+            const refreshBtn = document.getElementById('refreshBtn');
+            const lastUpdate = document.getElementById('lastUpdate');
             
             loadingDiv.style.display = 'block';
             errorDiv.style.display = 'none';
             table.style.display = 'none';
+            refreshBtn.disabled = true;
+            refreshBtn.textContent = '更新中...';
 
             try {
-                // 羽田空港の国際線到着便データを直接取得
-                // 注意: ブラウザのCORSポリシーにより、直接アクセスできない場合があります
-                const url = "https://tokyo-haneda.com/app_resource/flight/data/int/hdacfarv.json";
-                const resp = await fetch(url);
+                // 羽田空港の国際線到着便データを取得
+                // CORSプロキシを使用して取得
+                const originalUrl = "https://tokyo-haneda.com/app_resource/flight/data/int/hdacfarv.json";
+                const proxyUrls = [
+                    `https://api.allorigins.win/raw?url=${encodeURIComponent(originalUrl)}`,
+                    `https://corsproxy.io/?${encodeURIComponent(originalUrl)}`,
+                    `https://cors-anywhere.herokuapp.com/${originalUrl}`
+                ];
                 
-                if (!resp.ok) {
-                    throw new Error(`HTTP error! status: ${resp.status}`);
+                let resp;
+                let lastError;
+                
+                // 複数のプロキシを試す
+                for (const proxyUrl of proxyUrls) {
+                    try {
+                        resp = await fetch(proxyUrl);
+                        if (resp.ok) {
+                            break;
+                        }
+                    } catch (error) {
+                        lastError = error;
+                        continue;
+                    }
+                }
+                
+                if (!resp || !resp.ok) {
+                    throw lastError || new Error(`HTTP error! status: ${resp ? resp.status : 'Unknown'}`);
                 }
                 
                 const json = await resp.json();
@@ -96,6 +126,9 @@
                 
                 loadingDiv.style.display = 'none';
                 table.style.display = 'table';
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = '更新';
+                lastUpdate.textContent = `最終更新: ${new Date().toLocaleTimeString('ja-JP')}`;
 
             } catch (error) {
                 console.error('フライト情報の取得に失敗しました:', error);
@@ -104,23 +137,51 @@
                 const sampleFlights = [
                     {
                         flight_status: "定刻",
-                        arrival_time: "14:30",
+                        arrival_time: "13:15",
                         place_of_departure: "ソウル",
                         aircraft_code: "A320",
                         terminal: "2"
                     },
                     {
                         flight_status: "遅延",
-                        arrival_time: "15:45",
+                        arrival_time: "14:45",
                         place_of_departure: "台北",
                         aircraft_code: "B737",
                         terminal: "3"
                     },
                     {
                         flight_status: "手荷物引渡中",
-                        arrival_time: "16:20",
+                        arrival_time: "15:20",
                         place_of_departure: "上海",
                         aircraft_code: "A330",
+                        terminal: "2"
+                    },
+                    {
+                        flight_status: "定刻",
+                        arrival_time: "16:30",
+                        place_of_departure: "香港",
+                        aircraft_code: "A350",
+                        terminal: "3"
+                    },
+                    {
+                        flight_status: "到着",
+                        arrival_time: "17:10",
+                        place_of_departure: "シンガポール",
+                        aircraft_code: "B777",
+                        terminal: "2"
+                    },
+                    {
+                        flight_status: "定刻",
+                        arrival_time: "18:25",
+                        place_of_departure: "バンコク",
+                        aircraft_code: "A380",
+                        terminal: "3"
+                    },
+                    {
+                        flight_status: "遅延",
+                        arrival_time: "19:40",
+                        place_of_departure: "マニラ",
+                        aircraft_code: "B737",
                         terminal: "2"
                     }
                 ];
@@ -128,9 +189,21 @@
                 updateTable(sampleFlights);
                 
                 loadingDiv.style.display = 'none';
-                errorDiv.innerHTML = 'リアルタイムデータの取得に失敗しました。サンプルデータを表示しています。<br>CORSポリシーのため、直接アクセスができない可能性があります。';
+                errorDiv.innerHTML = `
+                    <strong>リアルタイムデータの取得に失敗しました。</strong><br>
+                    サンプルデータを表示しています。<br><br>
+                    <strong>解決方法:</strong><br>
+                    1. ブラウザを更新してもう一度お試しください<br>
+                    2. 少し時間をおいてから再度アクセスしてください<br>
+                    3. 別のブラウザでお試しください<br>
+                    4. ローカルサーバーで実行している場合は、HTTPSでアクセスしてください<br><br>
+                    <small>エラー詳細: ${error.message}</small>
+                `;
                 errorDiv.style.display = 'block';
                 table.style.display = 'table';
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = '更新';
+                lastUpdate.textContent = `最終更新: ${new Date().toLocaleTimeString('ja-JP')} (サンプルデータ)`;
             }
         }
 
