@@ -2,13 +2,15 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
-    <title>Flight Info</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>羽田空港 到着便一覧</title>
+    <link rel="stylesheet" href="css/style.css">
   </head>
   <body>
-    <link rel="stylesheet" href="/css/style.css">
-
-    <h1>到着便一覧</h1>
-    <table border="1" id="flightTable">
+    <h1>羽田空港 到着便一覧</h1>
+    <div id="loading" class="loading-message">フライト情報を読み込み中...</div>
+    <div id="error" class="error-message" style="display: none;"></div>
+    <table border="1" id="flightTable" style="display: none;">
         <thead>
             <tr>
                 <th>運行状況</th><th>到着時刻</th><th>出発地</th><th>機種</th><th>ターミナル</th>
@@ -21,11 +23,137 @@
 
     <script>
         async function fetchFlights() {
-            const res = await fetch('/api/flights');
-            const flights = await res.json();
+            const loadingDiv = document.getElementById('loading');
+            const errorDiv = document.getElementById('error');
+            const table = document.getElementById('flightTable');
+            
+            loadingDiv.style.display = 'block';
+            errorDiv.style.display = 'none';
+            table.style.display = 'none';
 
+            try {
+                // 羽田空港の国際線到着便データを直接取得
+                // 注意: ブラウザのCORSポリシーにより、直接アクセスできない場合があります
+                const url = "https://tokyo-haneda.com/app_resource/flight/data/int/hdacfarv.json";
+                const resp = await fetch(url);
+                
+                if (!resp.ok) {
+                    throw new Error(`HTTP error! status: ${resp.status}`);
+                }
+                
+                const json = await resp.json();
+
+                // 今日の日付を取得
+                const today = new Date().toLocaleDateString('ja-JP', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                }).replace(/\//g, '/');
+
+                // 正規表現の準備
+                const dateRegex = /\d{4}\/\d{2}\/\d{2}/;
+                const timeRegex = /\b([01]?\d|2[0-3]):[0-5]\d\b/;
+
+                const flights = [];
+
+                // フライト情報を処理
+                if (json.flight_info && Array.isArray(json.flight_info)) {
+                    json.flight_info.forEach(flightRow => {
+                        const note = flightRow["備考和名称"] || "";
+                        
+                        // 到着済みのフライトはスキップ
+                        if (note.includes("到着済み")) {
+                            return;
+                        }
+
+                        const scheduledTime = flightRow["定刻"] || "";
+                        const changedTime = flightRow["変更時刻"] || "";
+                        const timeStr = arrivalTime(scheduledTime, changedTime);
+
+                        // 日付をチェック
+                        const dateMatch = dateRegex.exec(timeStr);
+                        if (dateMatch && dateMatch[0] === today) {
+                            // 時刻を抽出
+                            const timeMatch = timeRegex.exec(timeStr);
+                            const arrivalTimeStr = timeMatch ? timeMatch[0] : "";
+
+                            flights.push({
+                                flight_status: (flightRow["備考訳名称"] && flightRow["備考訳名称"]["ja"]) || "",
+                                arrival_time: arrivalTimeStr,
+                                place_of_departure: flightRow["出発地空港和名称"] || "",
+                                aircraft_code: flightRow["機種コード"] || "",
+                                terminal: flightRow["ターミナル区分"] || ""
+                            });
+                        }
+                    });
+                }
+
+                // 時刻でソート
+                flights.sort((a, b) => a.arrival_time.localeCompare(b.arrival_time));
+
+                // テーブルを更新
+                updateTable(flights);
+                
+                loadingDiv.style.display = 'none';
+                table.style.display = 'table';
+
+            } catch (error) {
+                console.error('フライト情報の取得に失敗しました:', error);
+                
+                // エラー時はサンプルデータを表示
+                const sampleFlights = [
+                    {
+                        flight_status: "定刻",
+                        arrival_time: "14:30",
+                        place_of_departure: "ソウル",
+                        aircraft_code: "A320",
+                        terminal: "2"
+                    },
+                    {
+                        flight_status: "遅延",
+                        arrival_time: "15:45",
+                        place_of_departure: "台北",
+                        aircraft_code: "B737",
+                        terminal: "3"
+                    },
+                    {
+                        flight_status: "手荷物引渡中",
+                        arrival_time: "16:20",
+                        place_of_departure: "上海",
+                        aircraft_code: "A330",
+                        terminal: "2"
+                    }
+                ];
+                
+                updateTable(sampleFlights);
+                
+                loadingDiv.style.display = 'none';
+                errorDiv.innerHTML = 'リアルタイムデータの取得に失敗しました。サンプルデータを表示しています。<br>CORSポリシーのため、直接アクセスができない可能性があります。';
+                errorDiv.style.display = 'block';
+                table.style.display = 'table';
+            }
+        }
+
+        function arrivalTime(scheduledTime, changedTime) {
+            return changedTime || scheduledTime;
+        }
+
+        function updateTable(flights) {
             const tbody = document.querySelector('#flightTable tbody');
             tbody.innerHTML = ''; // クリア
+
+            if (flights.length === 0) {
+                const tr = document.createElement('tr');
+                const td = document.createElement('td');
+                td.colSpan = 5;
+                td.textContent = '本日の到着便はありません';
+                td.style.textAlign = 'center';
+                td.style.padding = '20px';
+                td.style.color = '#666';
+                tr.appendChild(td);
+                tbody.appendChild(tr);
+                return;
+            }
 
             flights.forEach(flight => {
               const tr = document.createElement('tr');
@@ -46,6 +174,7 @@
                   break;
                 case "欠航":
                   td1.style.backgroundColor = "#ff0000"; // 赤
+                  td1.style.color = "#ffffff";
                   break;
                 default:
                   td1.style.backgroundColor = "#ffffff"; // 白
@@ -90,6 +219,9 @@
 
         // ページ読み込み時に呼び出す
         window.onload = fetchFlights;
+        
+        // 定期的にデータを更新（5分ごと）
+        setInterval(fetchFlights, 5 * 60 * 1000);
     </script>
   </body>
 </html>
