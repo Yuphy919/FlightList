@@ -1,0 +1,23 @@
+#flightTable th {
+    background-color: #efefef;
+    text-align: center;
+}
+
+#flightTable td:nth-child(5) {
+    text-align: center;
+}
+
+
+#flightTable td:nth-child(2) {
+    text-align: center;
+}
+
+#flightTable td:nth-child(4) {
+    text-align: center;
+}
+
+/* #flightTable td:nth-child(5) {
+    color: white;
+    text-align: center;
+}
+ */

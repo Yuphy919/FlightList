@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Flight Info</title>
+  </head>
+  <body>
+    <link rel="stylesheet" href="/css/style.css">
+
+    <h1>到着便一覧</h1>
+    <table border="1" id="flightTable">
+        <thead>
+            <tr>
+                <th>運行状況</th><th>到着時刻</th><th>出発地</th><th>機種</th><th>ターミナル</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- データ行がここに入る -->
+        </tbody>
+    </table>
+
+    <script>
+        async function fetchFlights() {
+            const res = await fetch('/api/flights');
+            const flights = await res.json();
+
+            const tbody = document.querySelector('#flightTable tbody');
+            tbody.innerHTML = ''; // クリア
+
+            flights.forEach(flight => {
+              const tr = document.createElement('tr');
+
+              const td1 = document.createElement('td');
+              td1.textContent = flight.flight_status;
+
+              // 🔽 値に応じて背景色を設定
+              switch (flight.flight_status) {
+                case "遅延":
+                  td1.style.backgroundColor = "#fcccbe"; // 薄紅色
+                  break;
+                case "手荷物引渡中":
+                  td1.style.backgroundColor = "#ffff00"; // 黄色
+                  break;
+                case "到着":
+                  td1.style.backgroundColor = "#00ff00"; // 緑
+                  break;
+                case "欠航":
+                  td1.style.backgroundColor = "#ff0000"; // 赤
+                  break;
+                default:
+                  td1.style.backgroundColor = "#ffffff"; // 白
+              }
+
+              const td2 = document.createElement('td');
+              td2.textContent = flight.arrival_time;
+
+              const td3 = document.createElement('td');
+              td3.textContent = flight.place_of_departure;
+
+              const td4 = document.createElement('td');
+              td4.textContent = flight.aircraft_code;
+
+              const td5 = document.createElement('td');
+              td5.textContent = flight.terminal;
+              td5.style.textAlign = "center"; // 中央揃え
+
+              // 🔽 値に応じて背景色を設定
+              switch (flight.terminal) {
+                case "2":
+                  td5.style.color = "#ffffff"; // 白
+                  td5.style.backgroundColor = "#0082f0"; // 青
+                  break;
+                case "3":
+                  td5.style.color = "#ffffff"; // 白
+                  td5.style.backgroundColor = "#00afbd"; // エメラルドグリーン
+                  break;
+                default:
+                  td5.style.backgroundColor = "#ffffff"; // グレー（不明な値）
+              }
+
+              tr.appendChild(td1);
+              tr.appendChild(td2);
+              tr.appendChild(td3);
+              tr.appendChild(td4);
+              tr.appendChild(td5);
+
+              tbody.appendChild(tr);
+            });
+        }
+
+        // ページ読み込み時に呼び出す
+        window.onload = fetchFlights;
+    </script>
+  </body>
+</html>
